@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "local-lease-queue"
+version = "0.1.0"
+description = "A local SQLite work queue with expiring leases and stale-worker fencing."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "Light Huska", email = "lighthuska@gmail.com"}]
+dependencies = []
+
+[project.scripts]
+leasequeue = "leasequeue.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/leasequeue"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
