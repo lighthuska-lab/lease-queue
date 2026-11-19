@@ -20,6 +20,10 @@ class KeyConflict(ValueError):
 def seconds(value: float, *, positive: bool = False) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError("duration must be numeric")
+    try:
+        value = float(value)
+    except OverflowError as error:
+        raise ValueError("duration must be finite and in range") from error
     if not math.isfinite(value) or value < 0 or (positive and value == 0):
         raise ValueError("duration must be finite and in range")
     return float(value)
@@ -148,7 +152,7 @@ class Queue:
     ) -> bool:
         if (
             type(job_id) is not int
-            or job_id < 1
+            or not 1 <= job_id <= 2**63 - 1
             or not isinstance(receipt, str)
             or not receipt
         ):
@@ -185,6 +189,8 @@ class Queue:
         return result
 
     def get(self, job_id: int) -> dict[str, Any] | None:
+        if type(job_id) is not int or not 1 <= job_id <= 2**63 - 1:
+            raise ValueError("job id must be a positive SQLite integer")
         with self.transaction() as db:
             return self.read(db, job_id)
 

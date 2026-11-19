@@ -137,6 +137,20 @@ class QueueTests(unittest.TestCase):
                 self.q.finish(lease["id"], lease["receipt"], fail=True, delay=delay)
         self.assertEqual(self.q.get(lease["id"])["state"], "leased")
 
+    def test_oversized_numeric_arguments_are_rejected_without_mutation(self):
+        job = self.q.enqueue("a", {})
+        with self.assertRaises(ValueError):
+            self.q.claim(lease_seconds=10**400)
+        lease = self.q.claim()
+        with self.assertRaises(ValueError):
+            self.q.finish(job, lease["receipt"], fail=True, delay=10**400)
+        with self.assertRaises(ValueError):
+            self.q.finish(2**63, lease["receipt"])
+        with self.assertRaises(ValueError):
+            self.q.get(2**63)
+        self.assertEqual(self.q.get(job)["state"], "leased")
+        self.assertTrue(self.q.finish(job, lease["receipt"]))
+
     def test_nonfinite_clock_and_expiry_overflow_roll_back(self):
         self.q.enqueue("a", {})
         self.clock = math.nan
@@ -267,6 +281,22 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(main(base + ["bad json"]), 2)
                 self.assertEqual(main(base + ['{"a":1}']), 0)
                 self.assertEqual(main(base + ['{"a":2}']), 1)
+
+    def test_oversized_job_ids_report_option_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = ["--db", str(Path(folder) / "jobs.db")]
+            for args in (
+                ["show", "--id", str(2**63)],
+                ["ack", "--id", str(2**63), "--receipt", "stale"],
+            ):
+                output, errors = io.StringIO(), io.StringIO()
+                with (
+                    contextlib.redirect_stdout(output),
+                    contextlib.redirect_stderr(errors),
+                ):
+                    self.assertEqual(main(base + args), 2)
+                self.assertEqual(output.getvalue(), "")
+                self.assertIn("check database, payload and options", errors.getvalue())
 
     def test_memory_database_rejected(self):
         with self.assertRaises(ValueError):
